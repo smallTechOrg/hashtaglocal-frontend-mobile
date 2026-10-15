@@ -1,4 +1,4 @@
-# #local Mobile App
+# #local Frontend Mobile 
 
 **#local** is a mobile app for reporting local civic issues, finding nearby issues and events on a map, and chatting with your neighbourhood.
 This guide takes you from zero to running the app on your phone. No technical background is needed; just follow the steps in order.
