@@ -310,9 +310,15 @@ No rebuild. No Play Store submission. Users get it on next launch.
 npm test
 npm run test:coverage
 npm run lint
+<<<<<<< Updated upstream
 npx tsc --noEmit        # type-check
 ```
 
 ---
 
+=======
+npx tsc --noEmit        
+```
+
+>>>>>>> Stashed changes
 Support: **contact@smalltech.in**
