@@ -80,8 +80,35 @@ npx eas-cli env:delete SECRET_NAME
 - `EXPO_PUBLIC_GOOGLE_AUTH_REDIRECT_URI`
 - `EXPO_PUBLIC_GOOGLE_CLIENT_ID`
 - `GOOGLE_MAPS_API_KEY` (secret)
+- `ANDROID_GOOGLE_SERVICES` (file secret — Android Firebase config, production only)
+- `IOS_GOOGLE_SERVICES` (file secret — iOS Firebase config, production only)
 
 > **Note:** Local `.env` file is NOT used in EAS builds - only for `expo start`
+
+## Firebase Config Files
+
+`google-services.json` and `GoogleService-Info.plist` are gitignored. For EAS builds to work, upload them as file secrets once per environment:
+
+```bash
+# Android
+npx eas-cli env:create --scope project --name ANDROID_GOOGLE_SERVICES --type file --value ./google-services.json --environment production
+
+# iOS
+npx eas-cli env:create --scope project --name IOS_GOOGLE_SERVICES --type file --value ./GoogleService-Info.plist --environment production
+```
+
+**`app.config.js` must reference the secrets** (already updated):
+```js
+// Android
+googleServicesFile: process.env.ANDROID_GOOGLE_SERVICES ?? "./google-services.json",
+
+// iOS
+googleServicesFile: process.env.IOS_GOOGLE_SERVICES ?? "./GoogleService-Info.plist",
+```
+
+These secrets only exist for the `production` environment — `development` and `preview` builds fall back to the local gitignored files.
+
+Locally (during `expo start`) the files are read directly from disk. On EAS the env var path is used.
 
 ## Installation
 
