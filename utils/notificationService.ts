@@ -27,7 +27,7 @@ const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
 
 let syncInProgress: Promise<void> | null = null;
 
-export type NotificationType = 'ISSUE_DETAIL' | 'BROADCAST' | 'CHAT';
+export type NotificationType = 'ISSUE_DETAIL' | 'BROADCAST' | 'CHAT' | 'BULLETIN' | 'QUIZ';
 
 const getMsg = () => getMessaging(getApp());
 
@@ -165,6 +165,12 @@ export function navigateFromNotification(data?: Record<string, string>): void {
   } else if (data.type === 'CHAT') {
     router.push('/chat');
     console.log('[FCM] Navigated to chat (chat notification)');
+  } else if (data.type === 'BULLETIN') {
+    router.push('/bulletin');
+    console.log('[FCM] Navigated to bulletin (bulletin notification)');
+  } else if (data.type === 'QUIZ') {
+    router.push('/bulletin');
+    console.log('[FCM] Navigated to bulletin (quiz notification)');
   }
 }
 
