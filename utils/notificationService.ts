@@ -165,13 +165,23 @@ export function navigateFromNotification(data?: Record<string, string>): void {
   } else if (data.type === 'CHAT') {
     router.push('/chat');
     console.log('[FCM] Navigated to chat (chat notification)');
-  } else if (data.type === 'BULLETIN') {
-    router.push('/bulletin');
-    console.log('[FCM] Navigated to bulletin (bulletin notification)');
-  } else if (data.type === 'QUIZ') {
-    router.push('/bulletin');
-    console.log('[FCM] Navigated to bulletin (quiz notification)');
+  } else if (data.type === 'BULLETIN' || data.type === 'QUIZ') {
+    router.push({ pathname: '/bulletin', params: bulletinRouteParams(data) });
+    console.log(`[FCM] Navigated to bulletin (${data.type.toLowerCase()} notification)`);
   }
+}
+
+/**
+ * The backend's bulletin push carries { type, bulletinId, localityId, date, notificationLogId }.
+ * Hand the ones that identify the bulletin to the screen as route params (only those present, so
+ * a bare QUIZ push still opens the bulletin).
+ */
+function bulletinRouteParams(data: Record<string, string>): Record<string, string> {
+  const params: Record<string, string> = {};
+  for (const key of ['bulletinId', 'localityId', 'date'] as const) {
+    if (data[key]) params[key] = data[key];
+  }
+  return params;
 }
 
 // Holds the notification data when the app was opened from a killed state.
