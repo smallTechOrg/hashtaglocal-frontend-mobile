@@ -18,8 +18,8 @@ import { useUser } from "@/utils/UserContext";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useHeaderHeight } from "@react-navigation/elements";
-import { router } from "expo-router";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { router, useLocalSearchParams } from "expo-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -53,7 +53,16 @@ export default function ChatScreen() {
   const tabBarHeight = useBottomTabBarHeight();
 
   // The selected hashtag is global (header dropdown) — shared across all tabs.
-  const { hashtag, isRoot } = useHashtag();
+  const { hashtag, isRoot, setHashtag } = useHashtag();
+
+  // A chat push opens this screen with the post's locality hashtag: switch the chat to it, then
+  // clear the param so a later tap on another push for the same hashtag applies again.
+  const { hashtag: hashtagParam } = useLocalSearchParams<{ hashtag?: string }>();
+  useEffect(() => {
+    if (!hashtagParam) return;
+    setHashtag(hashtagParam);
+    router.setParams({ hashtag: undefined });
+  }, [hashtagParam, setHashtag]);
 
   const { posts, loading, loadingMore, error, hasMore, loadMore, reload } = useFeed(hashtag, {
     aggregate: isRoot,

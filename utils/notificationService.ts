@@ -19,6 +19,7 @@ import { clearCachedFCMToken, getCachedFCMToken, setCachedFCMToken } from '@/uti
 import { showNotificationBanner } from '@/utils/notificationBannerService';
 import {
   consumeNotifeeInitialNotification,
+  ensureNotificationChannel,
   postToSystemTray,
   setupNotifeeForegroundHandler,
 } from '@/utils/notificationTray';
@@ -27,7 +28,13 @@ const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
 
 let syncInProgress: Promise<void> | null = null;
 
-export type NotificationType = 'ISSUE_DETAIL' | 'BROADCAST' | 'CHAT' | 'BULLETIN' | 'QUIZ';
+export type NotificationType =
+  | 'ISSUE_DETAIL'
+  | 'ISSUE_UPDATE'
+  | 'BROADCAST'
+  | 'CHAT'
+  | 'BULLETIN'
+  | 'QUIZ';
 
 const getMsg = () => getMessaging(getApp());
 
@@ -156,15 +163,23 @@ export function navigateFromNotification(data?: Record<string, string>): void {
 
   console.log('[FCM] Navigating from notification:', data.type, data);
 
-  if (data.type === 'ISSUE_DETAIL' && data.issueId) {
+  // ISSUE_UPDATE is the backend's "New issue in …" / "Issue resolved in …" push; it opens the same
+  // issue detail page as ISSUE_DETAIL.
+  if ((data.type === 'ISSUE_DETAIL' || data.type === 'ISSUE_UPDATE') && data.issueId) {
     router.push({ pathname: '/issueDetail', params: { id: data.issueId } });
-    console.log('[FCM] Navigated to issueDetail, issueId:', data.issueId);
+    console.log(`[FCM] Navigated to issueDetail (${data.type}), issueId:`, data.issueId);
   } else if (data.type === 'BROADCAST') {
     router.push('/');
     console.log('[FCM] Navigated to map (broadcast notification)');
   } else if (data.type === 'CHAT') {
-    router.push('/chat');
-    console.log('[FCM] Navigated to chat (chat notification)');
+    // The chat push carries the post's locality hashtag; the chat screen switches to it so the
+    // user lands in the locality the message was posted in, not whichever one was last selected.
+    if (data.hashtag) {
+      router.push({ pathname: '/chat', params: { hashtag: data.hashtag } });
+    } else {
+      router.push('/chat');
+    }
+    console.log('[FCM] Navigated to chat (chat notification), hashtag:', data.hashtag ?? '');
   } else if (data.type === 'BULLETIN' || data.type === 'QUIZ') {
     router.push({ pathname: '/bulletin', params: bulletinRouteParams(data) });
     console.log(`[FCM] Navigated to bulletin (${data.type.toLowerCase()} notification)`);
@@ -195,6 +210,8 @@ export function consumePendingNotification(): Record<string, string> | null {
 }
 
 export function setupNotificationTapHandlers(): () => void {
+  ensureNotificationChannel();
+
   onNotificationOpenedApp(getMsg(), remoteMessage => {
     const data = remoteMessage.data as Record<string, string>;
     console.log('[FCM] Tap (background):', data);

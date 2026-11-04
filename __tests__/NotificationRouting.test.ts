@@ -85,6 +85,43 @@ describe("navigateFromNotification", () => {
     expect(push).toHaveBeenLastCalledWith({ pathname: "/issueDetail", params: { id: "456" } });
   });
 
+  it("opens the chat for the post's locality for a CHAT notification", () => {
+    // the payload the backend sends for a chat post push
+    navigateFromNotification({
+      type: "CHAT",
+      feedPostId: "11",
+      kind: "TEXT",
+      localityId: "3",
+      hashtag: "koramangala",
+      notificationLogId: "42",
+    });
+
+    expect(push).toHaveBeenCalledTimes(1);
+    expect(push).toHaveBeenCalledWith({ pathname: "/chat", params: { hashtag: "koramangala" } });
+  });
+
+  it("opens the issue detail page for an ISSUE_UPDATE notification", () => {
+    // the payload the backend sends for "New issue in …" / "Issue resolved in …"
+    navigateFromNotification({
+      type: "ISSUE_UPDATE",
+      issueId: "456",
+      status: "RESOLVED",
+      feedPostId: "12",
+      localityId: "3",
+      hashtag: "koramangala",
+      notificationLogId: "43",
+    });
+
+    expect(push).toHaveBeenCalledTimes(1);
+    expect(push).toHaveBeenCalledWith({ pathname: "/issueDetail", params: { id: "456" } });
+  });
+
+  it("does nothing for an ISSUE_UPDATE notification without an issueId", () => {
+    navigateFromNotification({ type: "ISSUE_UPDATE" });
+
+    expect(push).not.toHaveBeenCalled();
+  });
+
   it("does nothing for an ISSUE_DETAIL notification without an issueId", () => {
     navigateFromNotification({ type: "ISSUE_DETAIL" });
 
