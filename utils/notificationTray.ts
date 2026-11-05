@@ -12,6 +12,18 @@ async function getChannelId(): Promise<string> {
   return _channelId;
 }
 
+/**
+ * Creates the channel at app start. Background pushes name this channel (backend FcmSender), and it
+ * must already exist or Android falls back to a low-importance channel with no popup.
+ */
+export async function ensureNotificationChannel(): Promise<void> {
+  try {
+    await getChannelId();
+  } catch (error) {
+    console.warn('[Notifee] Failed to create notification channel:', error);
+  }
+}
+
 export async function postToSystemTray(
   title: string,
   body: string,

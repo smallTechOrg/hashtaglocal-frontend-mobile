@@ -10,8 +10,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import CustomText from '@/components/CustomText';
-import { trackNotificationOpened } from '@/utils/analytics';
-import { navigateFromNotification } from '@/utils/notificationService';
+import { navigateFromNotification, trackOpened } from '@/utils/notificationService';
 import { BannerConfig, setNotificationBannerListener } from '@/utils/notificationBannerService';
 import { cancelSystemTrayNotification } from '@/utils/notificationTray';
 
@@ -114,7 +113,7 @@ export default function NotificationBanner() {
     if (banner?.trayNotificationId) cancelSystemTrayNotification(banner.trayNotificationId);
     dismiss();
     if (banner?.data) {
-      trackNotificationOpened(banner.data.notificationLogId ?? 'unknown', banner.data.type ?? 'unknown');
+      trackOpened(banner.data);
       navigateFromNotification(banner.data);
     }
   };
