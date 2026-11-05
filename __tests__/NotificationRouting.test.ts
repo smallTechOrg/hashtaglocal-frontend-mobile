@@ -1,5 +1,6 @@
 import { router } from "expo-router";
 
+import { parseNotificationData } from "@/models/NotificationData";
 import { navigateFromNotification } from "@/utils/notificationService";
 
 // notificationService pulls in native Firebase / Notifee modules; only the routing is under test.
@@ -33,7 +34,10 @@ jest.mock("@/utils/notificationTray", () => ({
 
 const push = router.push as jest.Mock;
 
-describe("navigateFromNotification", () => {
+// what the app does with a tapped push: parse the raw FCM data, then route it
+const route = (raw: unknown) => navigateFromNotification(parseNotificationData(raw));
+
+describe("routing a tapped push", () => {
   beforeEach(() => {
     push.mockClear();
     jest.spyOn(console, "log").mockImplementation(() => {});
@@ -45,7 +49,7 @@ describe("navigateFromNotification", () => {
 
   it("opens the bulletin screen for a BULLETIN notification, passing the bulletin identity", () => {
     // the payload the backend sends for the daily bulletin push
-    navigateFromNotification({
+    route({
       type: "BULLETIN",
       bulletinId: "7",
       localityId: "3",
@@ -61,33 +65,26 @@ describe("navigateFromNotification", () => {
     });
   });
 
-  it("opens the bulletin screen for a QUIZ notification even with no payload", () => {
-    navigateFromNotification({ type: "QUIZ" });
-
-    expect(push).toHaveBeenCalledTimes(1);
-    expect(push).toHaveBeenCalledWith({ pathname: "/bulletin", params: {} });
-  });
-
   it("forwards only the bulletin params that are present", () => {
-    navigateFromNotification({ type: "BULLETIN", localityId: "3", date: "" });
+    route({ type: "BULLETIN", localityId: "3", date: "" });
 
     expect(push).toHaveBeenCalledWith({ pathname: "/bulletin", params: { localityId: "3" } });
   });
 
   it("still routes the existing notification types", () => {
-    navigateFromNotification({ type: "CHAT" });
+    route({ type: "CHAT" });
     expect(push).toHaveBeenLastCalledWith("/chat");
 
-    navigateFromNotification({ type: "BROADCAST" });
+    route({ type: "BROADCAST" });
     expect(push).toHaveBeenLastCalledWith("/");
 
-    navigateFromNotification({ type: "ISSUE_DETAIL", issueId: "456" });
+    route({ type: "ISSUE_DETAIL", issueId: "456" });
     expect(push).toHaveBeenLastCalledWith({ pathname: "/issueDetail", params: { id: "456" } });
   });
 
   it("opens the chat for the post's locality for a CHAT notification", () => {
     // the payload the backend sends for a chat post push
-    navigateFromNotification({
+    route({
       type: "CHAT",
       feedPostId: "11",
       kind: "TEXT",
@@ -100,10 +97,10 @@ describe("navigateFromNotification", () => {
     expect(push).toHaveBeenCalledWith({ pathname: "/chat", params: { hashtag: "koramangala" } });
   });
 
-  it("opens the issue detail page for an ISSUE_UPDATE notification", () => {
+  it("opens the issue detail page for a locality issue push", () => {
     // the payload the backend sends for "New issue in …" / "Issue resolved in …"
-    navigateFromNotification({
-      type: "ISSUE_UPDATE",
+    route({
+      type: "ISSUE_DETAIL",
       issueId: "456",
       status: "RESOLVED",
       feedPostId: "12",
@@ -116,22 +113,19 @@ describe("navigateFromNotification", () => {
     expect(push).toHaveBeenCalledWith({ pathname: "/issueDetail", params: { id: "456" } });
   });
 
-  it("does nothing for an ISSUE_UPDATE notification without an issueId", () => {
-    navigateFromNotification({ type: "ISSUE_UPDATE" });
-
-    expect(push).not.toHaveBeenCalled();
-  });
-
   it("does nothing for an ISSUE_DETAIL notification without an issueId", () => {
-    navigateFromNotification({ type: "ISSUE_DETAIL" });
+    route({ type: "ISSUE_DETAIL" });
 
     expect(push).not.toHaveBeenCalled();
   });
 
   it("does nothing for an unknown type or missing data", () => {
-    navigateFromNotification({ type: "SOMETHING_NEW" });
-    navigateFromNotification({});
-    navigateFromNotification(undefined);
+    route({ type: "SOMETHING_NEW" });
+    // never sent by the backend, so not routed
+    route({ type: "ISSUE_UPDATE", issueId: "456" });
+    route({ type: "QUIZ" });
+    route({});
+    route(undefined);
 
     expect(push).not.toHaveBeenCalled();
   });

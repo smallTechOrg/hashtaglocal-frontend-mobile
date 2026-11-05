@@ -13,6 +13,11 @@ import {
 } from '@react-native-firebase/messaging';
 import { router } from 'expo-router';
 import { PermissionsAndroid, Platform } from 'react-native';
+import {
+  BulletinNotificationData,
+  NotificationData,
+  parseNotificationData,
+} from '@/models/NotificationData';
 import { trackNotificationOpened } from '@/utils/analytics';
 import { apiPost, apiRequest } from '@/utils/apiClient';
 import { clearCachedFCMToken, getCachedFCMToken, setCachedFCMToken } from '@/utils/fcmCache';
@@ -27,14 +32,6 @@ import {
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
 
 let syncInProgress: Promise<void> | null = null;
-
-export type NotificationType =
-  | 'ISSUE_DETAIL'
-  | 'ISSUE_UPDATE'
-  | 'BROADCAST'
-  | 'CHAT'
-  | 'BULLETIN'
-  | 'QUIZ';
 
 const getMsg = () => getMessaging(getApp());
 
@@ -149,61 +146,70 @@ export function registerForegroundHandler(): () => void {
   return onMessage(getMsg(), async remoteMessage => {
     const title = remoteMessage.notification?.title ?? 'New notification';
     const body = remoteMessage.notification?.body ?? '';
-    const data = remoteMessage.data as Record<string, string> | undefined;
-    console.log('[FCM] Foreground message:', title, data);
+    // The tray keeps the raw data and hands it back on tap, where it is parsed again.
+    const rawData = remoteMessage.data as Record<string, string> | undefined;
+    const data = parseNotificationData(rawData) ?? undefined;
+    console.log('[FCM] Foreground message:', title, rawData);
 
-    const trayNotificationId = await postToSystemTray(title, body, data);
+    const trayNotificationId = await postToSystemTray(title, body, rawData);
     showNotificationBanner({ title, body, data, trayNotificationId });
-    console.log('[FCM] Notification displayed (banner + tray):', data?.type ?? 'unknown', data?.issueId ?? '');
+    console.log('[FCM] Notification displayed (banner + tray):', data?.type ?? 'unknown');
   });
 }
 
-export function navigateFromNotification(data?: Record<string, string>): void {
-  if (!data?.type) return;
+/** Reports a tapped push to analytics. */
+export function trackOpened(data: NotificationData | null | undefined): void {
+  trackNotificationOpened(data?.notificationLogId ?? 'unknown', data?.type ?? 'unknown');
+}
+
+export function navigateFromNotification(data: NotificationData | null | undefined): void {
+  if (!data) return;
 
   console.log('[FCM] Navigating from notification:', data.type, data);
 
-  // ISSUE_UPDATE is the backend's "New issue in …" / "Issue resolved in …" push; it opens the same
-  // issue detail page as ISSUE_DETAIL.
-  if ((data.type === 'ISSUE_DETAIL' || data.type === 'ISSUE_UPDATE') && data.issueId) {
+  // ISSUE_DETAIL covers every issue push: the reporter's "Issue is live", an ops broadcast, and the
+  // locality's "New issue in …" / "Issue resolved in …".
+  if (data.type === 'ISSUE_DETAIL') {
     router.push({ pathname: '/issueDetail', params: { id: data.issueId } });
     console.log(`[FCM] Navigated to issueDetail (${data.type}), issueId:`, data.issueId);
   } else if (data.type === 'BROADCAST') {
     router.push('/');
     console.log('[FCM] Navigated to map (broadcast notification)');
   } else if (data.type === 'CHAT') {
-    // The chat push carries the post's locality hashtag; the chat screen switches to it so the
-    // user lands in the locality the message was posted in, not whichever one was last selected.
+    // The backend's chat push (NotificationData in hashtaglocal-backend, PR #127) carries the post's
+    // locality hashtag; the chat screen switches to it so the user lands in the locality the message
+    // was posted in, not whichever one was last selected. Pushes without it (ops CHAT broadcasts,
+    // or a backend before #127) just open the chat as it is.
     if (data.hashtag) {
       router.push({ pathname: '/chat', params: { hashtag: data.hashtag } });
     } else {
       router.push('/chat');
     }
     console.log('[FCM] Navigated to chat (chat notification), hashtag:', data.hashtag ?? '');
-  } else if (data.type === 'BULLETIN' || data.type === 'QUIZ') {
+  } else if (data.type === 'BULLETIN') {
     router.push({ pathname: '/bulletin', params: bulletinRouteParams(data) });
-    console.log(`[FCM] Navigated to bulletin (${data.type.toLowerCase()} notification)`);
+    console.log('[FCM] Navigated to bulletin (bulletin notification)');
   }
 }
 
 /**
  * The backend's bulletin push carries { type, bulletinId, localityId, date, notificationLogId }.
- * Hand the ones that identify the bulletin to the screen as route params (only those present, so
- * a bare QUIZ push still opens the bulletin).
+ * Hand the ones that identify the bulletin to the screen as route params (only those present).
  */
-function bulletinRouteParams(data: Record<string, string>): Record<string, string> {
+function bulletinRouteParams(data: BulletinNotificationData): Record<string, string> {
   const params: Record<string, string> = {};
   for (const key of ['bulletinId', 'localityId', 'date'] as const) {
-    if (data[key]) params[key] = data[key];
+    const value = data[key];
+    if (value) params[key] = value;
   }
   return params;
 }
 
 // Holds the notification data when the app was opened from a killed state.
 // Consumed by AuthLoader once the user is confirmed authenticated.
-let pendingInitialNotification: Record<string, string> | null = null;
+let pendingInitialNotification: NotificationData | null = null;
 
-export function consumePendingNotification(): Record<string, string> | null {
+export function consumePendingNotification(): NotificationData | null {
   const data = pendingInitialNotification;
   pendingInitialNotification = null;
   return data;
@@ -213,9 +219,9 @@ export function setupNotificationTapHandlers(): () => void {
   ensureNotificationChannel();
 
   onNotificationOpenedApp(getMsg(), remoteMessage => {
-    const data = remoteMessage.data as Record<string, string>;
-    console.log('[FCM] Tap (background):', data);
-    trackNotificationOpened(data?.notificationLogId ?? 'unknown', data?.type ?? 'unknown');
+    console.log('[FCM] Tap (background):', remoteMessage.data);
+    const data = parseNotificationData(remoteMessage.data);
+    trackOpened(data);
     navigateFromNotification(data);
   });
 
@@ -225,18 +231,20 @@ export function setupNotificationTapHandlers(): () => void {
     getInitialNotification(getMsg()),
     consumeNotifeeInitialNotification(),
   ]).then(([fcmMessage, notifeeData]) => {
-    const data = (fcmMessage?.data as Record<string, string> | undefined) ?? notifeeData;
-    if (data) {
-      console.log('[FCM] Tap (quit state), deferring navigation:', data);
-      trackNotificationOpened(data.notificationLogId ?? 'unknown', data.type ?? 'unknown');
+    const rawData = fcmMessage?.data ?? notifeeData;
+    if (rawData) {
+      console.log('[FCM] Tap (quit state), deferring navigation:', rawData);
+      const data = parseNotificationData(rawData);
+      trackOpened(data);
       pendingInitialNotification = data;
     }
   });
 
   // Handles taps on notifee local notifications when app is in foreground/background.
-  return setupNotifeeForegroundHandler(data => {
-    console.log('[Notifee] Tap (foreground):', data);
-    trackNotificationOpened(data?.notificationLogId ?? 'unknown', data?.type ?? 'unknown');
+  return setupNotifeeForegroundHandler(rawData => {
+    console.log('[Notifee] Tap (foreground):', rawData);
+    const data = parseNotificationData(rawData);
+    trackOpened(data);
     navigateFromNotification(data);
   });
 }

@@ -1,7 +1,10 @@
+import { NotificationData } from '@/models/NotificationData';
+
 export type BannerConfig = {
   title: string;
   body: string;
-  data?: Record<string, string>;
+  /** Parsed push data; undefined if the push carried nothing the app can open. */
+  data?: NotificationData;
   trayNotificationId?: string;
 };
 
