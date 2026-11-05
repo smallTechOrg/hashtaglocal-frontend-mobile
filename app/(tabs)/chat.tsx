@@ -55,18 +55,28 @@ export default function ChatScreen() {
   // The selected hashtag is global (header dropdown) — shared across all tabs.
   const { hashtag, isRoot, setHashtag } = useHashtag();
 
-  // A chat push opens this screen with the post's locality hashtag: switch the chat to it, then
-  // clear the param so a later tap on another push for the same hashtag applies again.
-  const { hashtag: hashtagParam } = useLocalSearchParams<{ hashtag?: string }>();
-  useEffect(() => {
-    if (!hashtagParam) return;
-    setHashtag(hashtagParam);
-    router.setParams({ hashtag: undefined });
-  }, [hashtagParam, setHashtag]);
-
   const { posts, loading, loadingMore, error, hasMore, loadMore, reload } = useFeed(hashtag, {
     aggregate: isRoot,
   });
+
+  // A chat push tap sends a new `refresh` (and the post's hashtag): switch to that hashtag,
+  // or reload if already on it, so the new message shows. Each refresh is handled once.
+  const { hashtag: hashtagParam, refresh } = useLocalSearchParams<{
+    hashtag?: string;
+    refresh?: string;
+  }>();
+  const handledRefresh = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!refresh || handledRefresh.current === refresh) return;
+    handledRefresh.current = refresh;
+    const target = hashtagParam?.replace(/^#/, "").toLowerCase();
+    if (target && target !== hashtag) {
+      setHashtag(target);
+    } else {
+      reload();
+    }
+    router.setParams({ hashtag: undefined, refresh: undefined });
+  }, [refresh, hashtagParam, hashtag, setHashtag, reload]);
 
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);

@@ -73,7 +73,10 @@ describe("routing a tapped push", () => {
 
   it("still routes the existing notification types", () => {
     route({ type: "CHAT" });
-    expect(push).toHaveBeenLastCalledWith("/chat");
+    expect(push).toHaveBeenLastCalledWith({
+      pathname: "/chat",
+      params: { refresh: expect.any(String) },
+    });
 
     route({ type: "BROADCAST" });
     expect(push).toHaveBeenLastCalledWith("/");
@@ -94,7 +97,28 @@ describe("routing a tapped push", () => {
     });
 
     expect(push).toHaveBeenCalledTimes(1);
-    expect(push).toHaveBeenCalledWith({ pathname: "/chat", params: { hashtag: "koramangala" } });
+    expect(push).toHaveBeenCalledWith({
+      pathname: "/chat",
+      params: { hashtag: "koramangala", refresh: expect.any(String) },
+    });
+  });
+
+  it("sends a new refresh value on every chat tap, so an open chat reloads", () => {
+    const nowSpy = jest.spyOn(Date, "now");
+    nowSpy.mockReturnValueOnce(1000).mockReturnValueOnce(2000);
+
+    route({ type: "CHAT", hashtag: "koramangala" });
+    route({ type: "CHAT", hashtag: "koramangala" });
+
+    expect(push).toHaveBeenNthCalledWith(1, {
+      pathname: "/chat",
+      params: { hashtag: "koramangala", refresh: "1000" },
+    });
+    expect(push).toHaveBeenNthCalledWith(2, {
+      pathname: "/chat",
+      params: { hashtag: "koramangala", refresh: "2000" },
+    });
+    nowSpy.mockRestore();
   });
 
   it("opens the issue detail page for a locality issue push", () => {

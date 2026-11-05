@@ -176,15 +176,13 @@ export function navigateFromNotification(data: NotificationData | null | undefin
     router.push('/');
     console.log('[FCM] Navigated to map (broadcast notification)');
   } else if (data.type === 'CHAT') {
-    // The backend's chat push (NotificationData in hashtaglocal-backend, PR #127) carries the post's
-    // locality hashtag; the chat screen switches to it so the user lands in the locality the message
-    // was posted in, not whichever one was last selected. Pushes without it (ops CHAT broadcasts,
-    // or a backend before #127) just open the chat as it is.
-    if (data.hashtag) {
-      router.push({ pathname: '/chat', params: { hashtag: data.hashtag } });
-    } else {
-      router.push('/chat');
-    }
+    // Opens the chat on the post's locality hashtag (backend PR #127), if sent. `refresh` is new
+    // on every tap, so the chat reloads even when it's already open on that locality.
+    const refresh = String(Date.now());
+    router.push({
+      pathname: '/chat',
+      params: data.hashtag ? { hashtag: data.hashtag, refresh } : { refresh },
+    });
     console.log('[FCM] Navigated to chat (chat notification), hashtag:', data.hashtag ?? '');
   } else if (data.type === 'BULLETIN') {
     router.push({ pathname: '/bulletin', params: bulletinRouteParams(data) });
