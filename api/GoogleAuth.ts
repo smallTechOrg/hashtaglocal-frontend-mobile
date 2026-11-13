@@ -3,6 +3,7 @@ import { trackAuthFailed } from "@/utils/analytics";
 import * as WebBrowser from "expo-web-browser";
 import { Platform } from "react-native";
 import { getDeviceId } from "@/utils/deviceId";
+import { getAppVersion } from "@/utils/appVersion";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -15,10 +16,13 @@ export function useGoogleAuth() {
         const clientId = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID!;
         const deviceId = await getDeviceId();
 
-        // Encode platform + device_id in the OAuth state parameter.
+        // Encode platform + device_id + app_version in the OAuth state parameter.
         // Google echoes state back unchanged in the fragment alongside access_token,
         // so auth-handler.html can extract and forward them to the backend.
-        const state = new URLSearchParams({ platform: Platform.OS.toUpperCase(), device_id: deviceId }).toString();
+        const stateParams: Record<string, string> = { platform: Platform.OS.toUpperCase(), device_id: deviceId };
+        const appVersion = getAppVersion();
+        if (appVersion) stateParams.app_version = appVersion;
+        const state = new URLSearchParams(stateParams).toString();
 
         const authUrl =
             GOOGLE_AUTH_ENDPOINT +
