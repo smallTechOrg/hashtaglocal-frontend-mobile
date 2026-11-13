@@ -1,6 +1,7 @@
 import * as AppleAuthentication from "expo-apple-authentication";
 import { Platform } from "react-native";
 import { getDeviceId } from "@/utils/deviceId";
+import { getAppVersion } from "@/utils/appVersion";
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
 
@@ -38,6 +39,7 @@ export async function signInWithApple(): Promise<AppleSignInResult> {
         full_name: displayName ?? null,
         platform: Platform.OS.toUpperCase(),
         device_id: deviceId,
+        app_version: getAppVersion() ?? null,
       }),
     });
 

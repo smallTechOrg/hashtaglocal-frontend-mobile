@@ -1,3 +1,5 @@
+import { getAppVersion } from "@/utils/appVersion";
+
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
 
 export interface AuthTokens {
@@ -47,6 +49,8 @@ export async function refreshAuthToken(
   const body: Record<string, string> = { refresh_token: refreshToken };
   if (notificationToken) body.notification_token = notificationToken;
   if (deviceId) body.device_id = deviceId;
+  const appVersion = getAppVersion();
+  if (appVersion) body.app_version = appVersion;
 
   const response = await fetch(url, {
     method: "POST",
