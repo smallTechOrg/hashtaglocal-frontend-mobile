@@ -217,7 +217,7 @@ const IssueDetailScreen = () => {
         setIsDeleting(true);
         try {
             await rejectIssue(issueId);
-            router.replace("/(tabs)");
+            router.replace("/map");
         } catch (err) {
             const msg = err instanceof Error ? err.message : "Failed to delete issue";
             const crashlytics = getCrashlytics();

@@ -74,12 +74,12 @@ describe("routing a tapped push", () => {
   it("still routes the existing notification types", () => {
     route({ type: "CHAT" });
     expect(push).toHaveBeenLastCalledWith({
-      pathname: "/chat",
+      pathname: "/",
       params: { refresh: expect.any(String) },
     });
 
     route({ type: "BROADCAST" });
-    expect(push).toHaveBeenLastCalledWith("/");
+    expect(push).toHaveBeenLastCalledWith("/map");
 
     route({ type: "ISSUE_DETAIL", issueId: "456" });
     expect(push).toHaveBeenLastCalledWith({ pathname: "/issueDetail", params: { id: "456" } });
@@ -98,7 +98,7 @@ describe("routing a tapped push", () => {
 
     expect(push).toHaveBeenCalledTimes(1);
     expect(push).toHaveBeenCalledWith({
-      pathname: "/chat",
+      pathname: "/",
       params: { hashtag: "koramangala", refresh: expect.any(String) },
     });
   });
@@ -111,11 +111,11 @@ describe("routing a tapped push", () => {
     route({ type: "CHAT", hashtag: "koramangala" });
 
     expect(push).toHaveBeenNthCalledWith(1, {
-      pathname: "/chat",
+      pathname: "/",
       params: { hashtag: "koramangala", refresh: "1000" },
     });
     expect(push).toHaveBeenNthCalledWith(2, {
-      pathname: "/chat",
+      pathname: "/",
       params: { hashtag: "koramangala", refresh: "2000" },
     });
     nowSpy.mockRestore();

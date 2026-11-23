@@ -116,7 +116,7 @@ export default function CameraCapture() {
     if (router.canGoBack()) {
       router.back();
     } else {
-      router.replace("/(tabs)");
+      router.replace("/map");
     }
   };
 
