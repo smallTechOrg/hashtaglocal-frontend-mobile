@@ -173,14 +173,15 @@ export function navigateFromNotification(data: NotificationData | null | undefin
     router.push({ pathname: '/issueDetail', params: { id: data.issueId } });
     console.log(`[FCM] Navigated to issueDetail (${data.type}), issueId:`, data.issueId);
   } else if (data.type === 'BROADCAST') {
-    router.push('/');
+    router.push('/map');
     console.log('[FCM] Navigated to map (broadcast notification)');
   } else if (data.type === 'CHAT') {
     // Opens the chat on the post's locality hashtag (backend PR #127), if sent. `refresh` is new
     // on every tap, so the chat reloads even when it's already open on that locality.
     const refresh = String(Date.now());
+    // The chat is the `index` tab, so its path is `/`.
     router.push({
-      pathname: '/chat',
+      pathname: '/',
       params: data.hashtag ? { hashtag: data.hashtag, refresh } : { refresh },
     });
     console.log('[FCM] Navigated to chat (chat notification), hashtag:', data.hashtag ?? '');

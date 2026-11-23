@@ -29,7 +29,7 @@ export default function TabsLayout() {
   }, [events, eventsLoading, hashtag, isRoot]);
 
   // Memoize options to prevent unnecessary re-renders
-  const indexOptions = useMemo(() => ({
+  const mapOptions = useMemo(() => ({
     title: user?.hashtag || 'Map',
     headerTitleStyle: {
       fontFamily: "Nunito-Regular",
@@ -41,14 +41,15 @@ export default function TabsLayout() {
       fontFamily: "Nunito-Regular",
     },
     tabBarIcon: ({ color, focused }: { color: string; focused: boolean }) => (
-      <MaterialIcons 
-        name={focused ? 'map' : 'map'} 
-        color={color} 
-        size={24} 
+      <MaterialIcons
+        name={focused ? 'map' : 'map'}
+        color={color}
+        size={24}
       />
     ),
   }), [user?.hashtag]);
 
+  // Tab bar order follows the order of the screens below. `index` (Chat) is the screen the app opens on.
   return (
     <Tabs
       screenOptions={{
@@ -63,32 +64,6 @@ export default function TabsLayout() {
     >
       <Tabs.Screen
         name="index"
-        options={indexOptions}
-      />
-      <Tabs.Screen
-        name="issues"
-        options={{
-          title: 'Issues',
-          headerTitleStyle: {
-            fontFamily: "Nunito-Regular",
-          },
-          headerLeft: () => <DrawerToggleButton />,
-          headerRight: () => <KarmaBadge />,
-          tabBarLabel: 'Issues',
-          tabBarLabelStyle: {
-            fontFamily: "Nunito-Regular",
-          },
-          tabBarIcon: ({ color, focused }) => (
-            <MaterialIcons 
-              name={focused ? 'format-list-bulleted' : 'format-list-bulleted'} 
-              color={color} 
-              size={24} 
-            />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="chat"
         options={{
           title: 'Chat',
           headerTitleStyle: {
@@ -110,8 +85,30 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="bulletin"
-        options={{ href: null }}
+        name="map"
+        options={mapOptions}
+      />
+      <Tabs.Screen
+        name="issues"
+        options={{
+          title: 'Issues',
+          headerTitleStyle: {
+            fontFamily: "Nunito-Regular",
+          },
+          headerLeft: () => <DrawerToggleButton />,
+          headerRight: () => <KarmaBadge />,
+          tabBarLabel: 'Issues',
+          tabBarLabelStyle: {
+            fontFamily: "Nunito-Regular",
+          },
+          tabBarIcon: ({ color, focused }) => (
+            <MaterialIcons
+              name={focused ? 'format-list-bulleted' : 'format-list-bulleted'}
+              color={color}
+              size={24}
+            />
+          ),
+        }}
       />
       <Tabs.Screen
         name="events"
@@ -135,6 +132,10 @@ export default function TabsLayout() {
             />
           ),
         }}
+      />
+      <Tabs.Screen
+        name="bulletin"
+        options={{ href: null }}
       />
       <Tabs.Screen
         name="report"
