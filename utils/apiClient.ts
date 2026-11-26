@@ -9,8 +9,6 @@ import {
 } from "@/utils/tokenStorage";
 import { clearCachedFCMToken } from "@/utils/fcmCache";
 import { getDeviceId } from "@/utils/deviceId";
-import { router } from "expo-router";
-import { Alert } from "react-native";
 import { authEvents } from "./authEvents";
 import { getCrashlytics, recordError as recordCrashError } from "@react-native-firebase/crashlytics";
 
@@ -25,6 +23,12 @@ type RequestOptions = Omit<RequestInit, "headers"> & {
 // Lock to prevent multiple simultaneous refresh attempts
 let isRefreshing = false;
 let refreshPromise: Promise<string | null> | null = null;
+
+// Session expiry: no pop-up and no navigation here. Showing an Alert from this
+// layer stacked several "Session Expired" alerts at app start (one per failing
+// request, before the navigator mounted) and froze the screen on iOS.
+// We only emit the event; UserContext clears the user and useProtectedRoute
+// in app/_layout.tsx sends them to the login page.
 
 /**
  * Attempts to refresh the access token using the refresh token.
@@ -54,13 +58,7 @@ async function refreshAccessToken(): Promise<string | null> {
         recordCrashError(getCrashlytics(), new Error("[ApiClient] Refresh token expired - user must login again"));
         await clearTokens();
         await clearCachedFCMToken();
-        authEvents.emitSessionExpired(); // Clear user state in UserContext
-        Alert.alert(
-          "Session Expired",
-          "Your session has expired. Please log in again.",
-          [{ text: "OK" }]
-        );
-        router.replace("/login");
+        authEvents.emitSessionExpired(); // UserContext clears the user; useProtectedRoute redirects to /login
         return null;
       }
 
@@ -83,12 +81,6 @@ async function refreshAccessToken(): Promise<string | null> {
       await clearTokens();
       await clearCachedFCMToken();
       authEvents.emitSessionExpired();
-      Alert.alert(
-        "Session Expired",
-        "Your session has expired. Please log in again.",
-        [{ text: "OK" }]
-      );
-      router.replace("/login");
       return null;
     } finally {
       isRefreshing = false;
@@ -151,15 +143,9 @@ export async function apiRequest(
       if (token) {
         headers.Authorization = `Bearer ${token}`;
       } else {
-        // No valid token available - redirect to login
+        // No valid token available - log out (useProtectedRoute redirects to /login)
         console.log("[ApiClient] No valid token available, redirecting to login");
         authEvents.emitSessionExpired();
-        Alert.alert(
-          "Session Expired",
-          "Your session has expired. Please log in again.",
-          [{ text: "OK" }]
-        );
-        router.replace("/login");
         throw new Error("Authentication required. Please log in.");
       }
     }
@@ -184,17 +170,11 @@ export async function apiRequest(
           signal: controller.signal,
         });
 
-        // If still 401 after retry, redirect to login
+        // If still 401 after retry, log out (useProtectedRoute redirects to /login)
         if (response.status === 401) {
           recordCrashError(getCrashlytics(), new Error("[ApiClient] Still 401 after token refresh, redirecting to login"));
           await clearTokens();
           authEvents.emitSessionExpired();
-          Alert.alert(
-            "Session Expired",
-            "Your session has expired. Please log in again.",
-            [{ text: "OK" }]
-          );
-          router.replace("/login");
         }
       }
     }
