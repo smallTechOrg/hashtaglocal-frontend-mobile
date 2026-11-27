@@ -8,7 +8,12 @@ import { EventsProvider } from "@/utils/EventsContext";
 import { HashtagProvider } from "@/utils/HashtagContext";
 import { IssuesProvider } from "@/utils/IssuesContext";
 import { KarmaProvider, useKarma } from "@/utils/KarmaContext";
-import { getFastLocationWithProgressiveWatch } from "@/utils/LocationService";
+import {
+  checkLocationPermission,
+  getFastLocationWithProgressiveWatch,
+  startProgressiveWatch,
+  subscribeToBestLocation,
+} from "@/utils/LocationService";
 import { clearTokens, getAccessToken } from "@/utils/tokenStorage";
 import { UserProvider, UserSummary, useUser } from "@/utils/UserContext";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -60,6 +65,34 @@ function AuthLoader({ children }: { children: React.ReactNode }) {
   }, [user]);
 
   useEffect(() => {
+    // Set when the profile was loaded without a location (first launch after install, GPS not ready
+    // yet). The backend can't pick the home hashtag then, so we load the profile again as soon as
+    // the first location fix arrives; that moves the chat from #india to the user's own hashtag.
+    let unsubscribeLocation: (() => void) | null = null;
+    let cancelled = false;
+
+    async function reloadProfileWithLocation() {
+      const { granted } = await checkLocationPermission();
+      if (!granted || cancelled) return; // never re-prompt here; the user already answered
+      unsubscribeLocation = subscribeToBestLocation((loc) => {
+        unsubscribeLocation?.();
+        unsubscribeLocation = null;
+        if (cancelled) return;
+        apiGet(`${API_BASE_URL}/account/profile?lat=${loc.latitude}&lng=${loc.longitude}`)
+          .then(async (response) => {
+            if (!response.ok || cancelled) return;
+            const data = await response.json();
+            const { username, picture, user_role, hashtag, user_summary } = data.data.user;
+            console.log("Profile reloaded with location, hashtag:", hashtag);
+            setUser({ username, picture, user_role, hashtag, user_summary });
+            setKarma(user_summary?.karma_earned ?? 0, user_summary?.karma_pending ?? 0);
+          })
+          .catch((e) => console.log("Profile reload with location failed:", e));
+      });
+      // Make sure something is watching for a fix (no-op if a watch is already running).
+      startProgressiveWatch({ accuracyTargetMeters: 400, timeoutMs: 60000 }).catch(() => {});
+    }
+
     async function loadUserProfile() {
       console.log("=== AuthLoader: Starting loadUserProfile ===");
 
@@ -75,6 +108,7 @@ function AuthLoader({ children }: { children: React.ReactNode }) {
 
         // Get user location for profile API
         let profileUrl = `${API_BASE_URL}/account/profile`;
+        let hasLocation = false;
         try {
           const location = await getFastLocationWithProgressiveWatch({
             instantLoad: true,
@@ -83,6 +117,7 @@ function AuthLoader({ children }: { children: React.ReactNode }) {
           if (location.success) {
             const { latitude, longitude } = location.location;
             profileUrl = `${API_BASE_URL}/account/profile?lat=${latitude}&lng=${longitude}`;
+            hasLocation = true;
           }
         } catch (locError) {
           console.log("Location not available for profile API, using without location");
@@ -97,6 +132,7 @@ function AuthLoader({ children }: { children: React.ReactNode }) {
           console.log("Profile loaded:", username, "hashtag:", hashtag);
           setUser({ username, picture, user_role, hashtag, user_summary });
           setKarma(user_summary?.karma_earned ?? 0, user_summary?.karma_pending ?? 0);
+          if (!hasLocation) reloadProfileWithLocation();
         } else {
           console.log("Profile fetch failed with status:", response.status);
           await clearTokens();
@@ -117,6 +153,10 @@ function AuthLoader({ children }: { children: React.ReactNode }) {
     }
 
     loadUserProfile();
+    return () => {
+      cancelled = true;
+      unsubscribeLocation?.();
+    };
   }, [setUser, setIsLoading, setKarma]);
 
   return <>{children}</>;

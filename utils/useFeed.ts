@@ -1,8 +1,12 @@
 import { fetchFeedTimeline } from "@/api/Feed";
 import { FeedPost } from "@/models/Feed";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { AppState } from "react-native";
 
 const PAGE_SIZE = 30;
+// Coming back to the app after at least this long in the background refreshes the feed.
+// Shorter trips (e.g. switching apps to copy something) keep the current list as is.
+const FOREGROUND_REFRESH_AFTER_MS = 60 * 1000;
 
 interface UseFeedResult {
   pinned: FeedPost[];
@@ -89,10 +93,46 @@ export function useFeed(
       .finally(() => setLoadingMore(false));
   }, [hashtag, loadingMore, fetchPage]);
 
+  // Silent refresh: fetch the newest page without showing the loading spinner, so the chat
+  // doesn't flash. On failure, keep the posts already on screen.
+  const refresh = useCallback(() => {
+    if (!hashtag) return;
+    const reqId = ++reqIdRef.current;
+    cursorRef.current = null;
+    fetchPage(null, false, reqId).catch(() => {
+      /* keep what we have */
+    });
+  }, [hashtag, fetchPage]);
+
   useEffect(() => {
     reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hashtag, aggregate]);
 
-  return { pinned, posts, loading, loadingMore, error, hasMore, loadMore, reload };
+  // The app can stay open in the background for hours (e.g. overnight). When it comes back to
+  // the foreground after a while, load the latest posts so new ones (like today's bulletin) show.
+  useEffect(() => {
+    let backgroundedAt: number | null = null;
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "background") {
+        backgroundedAt = Date.now();
+      } else if (state === "active" && backgroundedAt !== null) {
+        const away = Date.now() - backgroundedAt;
+        backgroundedAt = null;
+        if (away >= FOREGROUND_REFRESH_AFTER_MS) refresh();
+      }
+    });
+    return () => sub.remove();
+  }, [refresh]);
+
+  return {
+    pinned,
+    posts,
+    loading,
+    loadingMore,
+    error,
+    hasMore,
+    loadMore,
+    reload,
+  };
 }
