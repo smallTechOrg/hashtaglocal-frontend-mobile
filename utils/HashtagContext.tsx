@@ -6,6 +6,10 @@ const STORAGE_KEY = "htl_selected_hashtag";
 const RECENT_KEY = "htl_recent_hashtags";
 const ROOT = "india";
 const MAX_RECENT = 5;
+// The profile API returns "#local" when it can't tell where the user is (no location sent yet, e.g.
+// on the first launch after install). It is not a real locality — its feed is a 404 — so it must
+// never become the selected hashtag. We stay on #india until the real home hashtag arrives.
+const UNKNOWN_HOME = "local";
 
 interface HashtagContextType {
   /** Normalized selected hashtag, no leading '#'. e.g. "bengaluru" or "india". */
@@ -32,7 +36,7 @@ export function HashtagProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY)
       .then((saved) => {
-        if (saved && !lockedRef.current) {
+        if (saved && normalize(saved) !== UNKNOWN_HOME && !lockedRef.current) {
           lockedRef.current = true;
           setHashtagState(normalize(saved));
         }
@@ -57,7 +61,7 @@ export function HashtagProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (lockedRef.current) return;
     const home = normalize(user?.hashtag);
-    if (home) setHashtagState(home);
+    if (home && home !== UNKNOWN_HOME) setHashtagState(home);
   }, [user?.hashtag]);
 
   const setHashtag = useCallback((next: string) => {
