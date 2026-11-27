@@ -125,5 +125,14 @@ export function useFeed(
     return () => sub.remove();
   }, [refresh]);
 
-  return { pinned, posts, loading, loadingMore, error, hasMore, loadMore, reload };
+  return {
+    pinned,
+    posts,
+    loading,
+    loadingMore,
+    error,
+    hasMore,
+    loadMore,
+    reload,
+  };
 }
